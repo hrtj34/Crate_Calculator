@@ -16,11 +16,8 @@ from dropchance_reader import DropchanceReader
 class ContainerOpener:
     def __init__(self) -> None:
         pass
-
-    def select_item_in_group(self, group_dropchances: dict, drops: dict) -> None:
-        dropchance_pruner = DropchancePruner()
-
-        upper_bound_probability = ceil(dropchance_pruner.get_group_probability(group_dropchances))
+    
+    def random_selection(self, group_dropchances: dict, drops: dict, upper_bound_probability: int = 1) -> None:
         random_number = uniform(0.0, upper_bound_probability)
         covered_chance_space = 0.0
 
@@ -31,22 +28,37 @@ class ContainerOpener:
                     drops[item] = drops.get(item, 0) + amount
                     return
 
-    def open_container(self, container: str, num_opening: int, dropchances: DropchanceReader) -> dict:
+    def select_item_in_group(self, group_dropchances: dict, drops: dict) -> None:
         dropchance_pruner = DropchancePruner()
-        drops = {}
+
+        upper_bound_probability = ceil(dropchance_pruner.get_group_probability(group_dropchances))
+        num_drops = upper_bound_probability
+
+        for i in range(num_drops):
+            self.random_selection(group_dropchances, drops, upper_bound_probability)
         
+
+    def open_container(self, container: str, num_opening: int, dropchances: DropchanceReader) -> dict:
+        drops = {}
+        groups_list = []
+        all_dropchances = dropchances.read_dropchance(container, groups_list)
+
+        group_dropchances_list = []
+        for group in groups_list:
+            group_dropchances = {}
+            for item in group:
+                group_dropchances[item] = all_dropchances[item]
+            group_dropchances_list.append(group_dropchances)
+
         for i in range(num_opening):
-            groups_list = []
-            all_dropchances = dropchances.read_dropchance(container, groups_list)
-            for group in groups_list:
-                group_dropchances = {}
-                for item in group:
-                    group_dropchances[item] = all_dropchances[item]
+            for group_dropchances in group_dropchances_list:
                 self.select_item_in_group(group_dropchances, drops)
+        
+        if all_dropchances and not drops:
+            drops['loser'] = 0
+            return drops
 
             
-
-
         cascaded_drops = []
         secondary_drops = {}
         for drop, amount in drops.items():
@@ -61,6 +73,7 @@ class ContainerOpener:
         for item, amount in secondary_drops.items():
             drops[item] = drops.get(item, 0) + amount
 
+        drops.pop('loser', None)
         return drops
 
 
@@ -79,10 +92,10 @@ dropchances_mega_container = {
     },
 
     "mega container group container": {
-        "collect em all container": {1: 5 * 0.0635},
+        "collect em all container": {1: 25 * 0.0635},
         "mystery box i": {1: 5 * 0.0635},
         "black box i": {1: 5 * 0.0635},
-        "grand surprise container": {1: 5 * 0.0095}
+        "grand surprise container": {1: 2 * 5 * 0.0095}
     },
 }
 dropchance_reader = DropchanceReader(dropchances_mega_container)
